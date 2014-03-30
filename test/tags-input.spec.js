@@ -336,6 +336,38 @@ describe('tags-input directive', function() {
         });
     });
 
+    describe('add-on-tab option', function() {
+        it('adds a new tag when the tab key is pressed and the option is true', function() {
+            // Arrange
+            compile('add-on-tab="true"');
+
+            // Act
+            newTag('foo', KEYS.tab);
+
+            // Assert
+            expect($scope.tags).toEqual([{ text: 'foo' }]);
+        });
+
+        it('does not add a new tag when the tab key is pressed and the option is false', function() {
+            // Arrange
+            compile('add-on-tab="false"');
+
+            // Act
+            newTag('foo', KEYS.tab);
+
+            // Assert
+            expect($scope.tags).toEqual([]);
+        });
+
+        it('initializes the option to true', function() {
+            // Arrange/Act
+            compile();
+
+            // Assert
+            expect(isolateScope.options.addOnTab).toBe(true);
+        });
+    });
+
     describe('add-on-space option', function() {
         it('adds a new tag when the space key is pressed and the option is true', function() {
             // Arrange
@@ -987,7 +1019,7 @@ describe('tags-input directive', function() {
         describe('option is true', function() {
             beforeEach(function() {
                 compileWithForm('add-from-autocomplete-only="true"', 'name="tags"', 'allow-leftover-text="false"',
-                    'add-on-blur="true"', 'add-on-enter="true"', 'add-on-comma="true"', 'add-on-space="true"');
+                    'add-on-blur="true"', 'add-on-enter="true"', 'add-on-comma="true"', 'add-on-tab="true"','add-on-space="true"');
             });
 
             it('does not add a tag when the enter key is pressed', function() {
@@ -1009,6 +1041,14 @@ describe('tags-input directive', function() {
             it('does not add a tag when the space key is pressed', function() {
                 // Act
                 newTag('foo', KEYS.space);
+
+                // Assert
+                expect($scope.tags).toEqual([]);
+            });
+
+            it('does not add a tag when the tab key is pressed', function() {
+                // Act
+                newTag('foo', KEYS.tab);
 
                 // Assert
                 expect($scope.tags).toEqual([]);
@@ -1171,12 +1211,12 @@ describe('tags-input directive', function() {
         var hotkeys;
 
         beforeEach(function() {
-            compile('add-on-enter="true"', 'add-on-space="true"', 'add-on-comma="true"');
+            compile('add-on-enter="true"', 'add-on-space="true"', 'add-on-comma="true"', 'add-on-tab="true"');
         });
 
         describe('modifier key is on', function() {
             beforeEach(function() {
-                hotkeys = [KEYS.enter, KEYS.comma, KEYS.space, KEYS.backspace];
+                hotkeys = [KEYS.enter, KEYS.comma, KEYS.space, KEYS.backspace, KEYS.tab];
             });
 
             it('does not prevent any hotkey from being propagated when the shift key is down', function() {
@@ -1208,7 +1248,7 @@ describe('tags-input directive', function() {
         describe('modifier key is off', function() {
             it('prevents enter, comma and space keys from being propagated when all modifiers are up', function() {
                 // Arrange
-                hotkeys = [KEYS.enter, KEYS.comma, KEYS.space];
+                hotkeys = [KEYS.enter, KEYS.comma, KEYS.space, KEYS.tab];
 
                 // Act/Assert
                 angular.forEach(hotkeys, function(key) {

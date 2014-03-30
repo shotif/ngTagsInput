@@ -17,18 +17,21 @@
  * @param {boolean=} [highlightMatchedText=true] Flag indicating that the matched text will be highlighted in the
  *                                               suggestions list.
  * @param {number=} [maxResultsToShow=10] Maximum number of results to be displayed at a time.
+ *
+ * @param {boolean=} [showSuggestionsOnDownkey=false] When true the suggestion box will load and become visible on down
+ *                                                   down key trigger.
  */
-tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInputConfig) {
+tagsInput.directive('autoComplete', function ($document, $timeout, $sce, tagsInputConfig) {
     function SuggestionList(loadFn, options) {
         var self = {}, debouncedLoadId, getDifference, lastPromise;
 
-        getDifference = function(array1, array2) {
-            return array1.filter(function(item) {
+        getDifference = function (array1, array2) {
+            return array1.filter(function (item) {
                 return !findInObjectArray(array2, item, options.tagsInput.displayProperty);
             });
         };
 
-        self.reset = function() {
+        self.reset = function () {
             lastPromise = null;
 
             self.items = [];
@@ -39,24 +42,25 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
 
             $timeout.cancel(debouncedLoadId);
         };
-        self.show = function() {
+        self.show = function () {
             self.selected = null;
+            self.select(0);
             self.visible = true;
         };
-        self.load = function(query, tags) {
-            if (query.length < options.minLength) {
+        self.load = function (query, tags, override) {
+            if (!override && query.length < options.minLength) {
                 self.reset();
                 return;
             }
 
             $timeout.cancel(debouncedLoadId);
-            debouncedLoadId = $timeout(function() {
+            debouncedLoadId = $timeout(function () {
                 self.query = query;
 
                 var promise = loadFn({ $query: query });
                 lastPromise = promise;
 
-                promise.then(function(items) {
+                promise.then(function (items) {
                     if (promise !== lastPromise) {
                         return;
                     }
@@ -72,13 +76,13 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
                 });
             }, options.debounceDelay, false);
         };
-        self.selectNext = function() {
+        self.selectNext = function () {
             self.select(++self.index);
         };
-        self.selectPrior = function() {
+        self.selectPrior = function () {
             self.select(--self.index);
         };
-        self.select = function(index) {
+        self.select = function (index) {
             if (index < 0) {
                 index = self.items.length - 1;
             }
@@ -101,11 +105,11 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
     }
 
     return {
-        restrict: 'E',
+        restrict: 'EA',
         require: '^tagsInput',
         scope: { source: '&' },
         templateUrl: 'ngTagsInput/auto-complete.html',
-        link: function(scope, element, attrs, tagsInputCtrl) {
+        link: function (scope, element, attrs, tagsInputCtrl) {
             var hotkeys = [KEYS.enter, KEYS.tab, KEYS.escape, KEYS.up, KEYS.down],
                 suggestionList, tagsInput, options, getItemText, markdown;
 
@@ -113,7 +117,8 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
                 debounceDelay: [Number, 100],
                 minLength: [Number, 3],
                 highlightMatchedText: [Boolean, true],
-                maxResultsToShow: [Number, 10]
+                maxResultsToShow: [Number, 10],
+                showSuggestionsOnDownkey: [Boolean, false]
             });
 
             options = scope.options;
@@ -123,25 +128,25 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
 
             suggestionList = new SuggestionList(scope.source, options);
 
-            getItemText = function(item) {
+            getItemText = function (item) {
                 return item[options.tagsInput.displayProperty];
             };
 
             if (options.highlightMatchedText) {
-                markdown = function(item, text) {
+                markdown = function (item, text) {
                     var expression = new RegExp(text, 'gi');
                     return item.replace(expression, '**$&**');
                 };
             }
             else {
-                markdown = function(item) {
+                markdown = function (item) {
                     return item;
                 };
             }
 
             scope.suggestionList = suggestionList;
 
-            scope.addSuggestion = function() {
+            scope.addSuggestion = function () {
                 var added = false;
 
                 if (suggestionList.selected) {
@@ -154,7 +159,7 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
                 return added;
             };
 
-            scope.highlight = function(item) {
+            scope.highlight = function (item) {
                 var text = getItemText(item);
                 text = markdown(text, suggestionList.query);
                 text = encodeHTML(text);
@@ -162,23 +167,24 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
                 return $sce.trustAsHtml(text);
             };
 
-            scope.track = function(item) {
+            scope.track = function (item) {
                 return getItemText(item);
             };
 
             tagsInput
-                .on('tag-added invalid-tag', function() {
+                .on('tag-added invalid-tag', function () {
                     suggestionList.reset();
                 })
-                .on('input-change', function(value) {
+                .on('input-change', function (value) {
                     if (value) {
                         suggestionList.load(value, tagsInput.getTags());
                     } else {
                         suggestionList.reset();
                     }
                 })
-                .on('input-keydown', function(e) {
-                    var key, handled;
+                .on('input-keydown', function (e) {
+                    var key = e.keyCode,
+                        handled = false;
 
                     if (hotkeys.indexOf(e.keyCode) === -1) {
                         return;
@@ -188,17 +194,15 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
                     // I've sent a PR to Angular addressing this issue and hopefully it'll be fixed soon.
                     // https://github.com/angular/angular.js/pull/4833
                     var immediatePropagationStopped = false;
-                    e.stopImmediatePropagation = function() {
+                    e.stopImmediatePropagation = function () {
                         immediatePropagationStopped = true;
                         e.stopPropagation();
                     };
-                    e.isImmediatePropagationStopped = function() {
+                    e.isImmediatePropagationStopped = function () {
                         return immediatePropagationStopped;
                     };
 
                     if (suggestionList.visible) {
-                        key = e.keyCode;
-                        handled = false;
 
                         if (key === KEYS.down) {
                             suggestionList.selectNext();
@@ -215,19 +219,24 @@ tagsInput.directive('autoComplete', function($document, $timeout, $sce, tagsInpu
                         else if (key === KEYS.enter || key === KEYS.tab) {
                             handled = scope.addSuggestion();
                         }
+                    }
+                    else if (key === KEYS.down && scope.options.showSuggestionsOnDownkey) {
+                        var val = e.currentTarget ? e.currentTarget.value : null;
+                        suggestionList.load(val && val.length > 0 ? val : null, tagsInput.getTags(), true);
+                        handled = true;
+                    }
 
-                        if (handled) {
-                            e.preventDefault();
-                            e.stopImmediatePropagation();
-                            scope.$apply();
-                        }
+                    if (handled) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        scope.$apply();
                     }
                 })
-                .on('input-blur', function() {
+                .on('input-blur', function () {
                     suggestionList.reset();
                 });
 
-            $document.on('click', function() {
+            $document.on('click', function () {
                 if (suggestionList.visible) {
                     suggestionList.reset();
                     scope.$apply();

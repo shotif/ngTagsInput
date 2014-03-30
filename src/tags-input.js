@@ -21,6 +21,7 @@
  * @param {boolean=} [addOnEnter=true] Flag indicating that a new tag will be added on pressing the ENTER key.
  * @param {boolean=} [addOnSpace=false] Flag indicating that a new tag will be added on pressing the SPACE key.
  * @param {boolean=} [addOnComma=true] Flag indicating that a new tag will be added on pressing the COMMA key.
+ * @param {boolean=} [addOnTab=true] Flag indicating that a new tag will be added on pressing the TAB key.
  * @param {boolean=} [addOnBlur=true] Flag indicating that a new tag will be added when the input field loses focus.
  * @param {boolean=} [replaceSpacesWithDashes=true] Flag indicating that spaces will be replaced with dashes.
  * @param {string=} [allowedTagsPattern=^&#91;a-zA-Z0-9\s&#93;+$] Regular expression that determines whether a new tag is valid.
@@ -28,24 +29,24 @@
  *                                                the new tag input box instead of being removed when the backspace key
  *                                                is pressed and the input box is empty.
  * @param {boolean=} [addFromAutocompleteOnly=false] Flag indicating that only tags coming from the autocomplete list will be allowed.
- *                                                   When this flag is true, addOnEnter, addOnComma, addOnSpace, addOnBlur and
+ *                                                   When this flag is true, addOnEnter, addOnComma, addOnTab, addOnSpace, addOnBlur and
  *                                                   allowLeftoverText values are ignored.
  * @param {expression} onTagAdded Expression to evaluate upon adding a new tag. The new tag is available as $tag.
  * @param {expression} onTagRemoved Expression to evaluate upon removing an existing tag. The removed tag is available as $tag.
  */
-tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) {
+tagsInput.directive('tagsInput', function ($timeout, $document, tagsInputConfig) {
     function TagList(options, events) {
         var self = {}, getTagText, setTagText, tagIsValid;
 
-        getTagText = function(tag) {
+        getTagText = function (tag) {
             return tag[options.displayProperty];
         };
 
-        setTagText = function(tag, text) {
+        setTagText = function (tag, text) {
             tag[options.displayProperty] = text;
         };
 
-        tagIsValid = function(tag) {
+        tagIsValid = function (tag) {
             var tagText = getTagText(tag);
 
             return tagText.length >= options.minLength &&
@@ -56,13 +57,13 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
 
         self.items = [];
 
-        self.addText = function(text) {
+        self.addText = function (text) {
             var tag = {};
             setTagText(tag, text);
             return self.add(tag);
         };
 
-        self.add = function(tag) {
+        self.add = function (tag) {
             var tagText = getTagText(tag).trim();
 
             if (options.replaceSpacesWithDashes) {
@@ -82,13 +83,13 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
             return tag;
         };
 
-        self.remove = function(index) {
+        self.remove = function (index) {
             var tag = self.items.splice(index, 1)[0];
             events.trigger('tag-removed', { $tag: tag });
             return tag;
         };
 
-        self.removeLast = function() {
+        self.removeLast = function () {
             var tag, lastTagIndex = self.items.length - 1;
 
             if (options.enableEditingLastTag || self.selected) {
@@ -106,7 +107,7 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
     }
 
     return {
-        restrict: 'E',
+        restrict: 'EA',
         require: 'ngModel',
         scope: {
             tags: '=ngModel',
@@ -116,7 +117,7 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
         replace: false,
         transclude: true,
         templateUrl: 'ngTagsInput/tags-input.html',
-        controller: function($scope, $attrs, $element) {
+        controller: function ($scope, $attrs, $element) {
             tagsInputConfig.load('tagsInput', $scope, $attrs, {
                 placeholder: [String, 'Add a tag'],
                 tabindex: [Number],
@@ -127,6 +128,7 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
                 addOnEnter: [Boolean, true],
                 addOnSpace: [Boolean, false],
                 addOnComma: [Boolean, true],
+                addOnTab: [Boolean, true],
                 addOnBlur: [Boolean, true],
                 allowedTagsPattern: [RegExp, /.+/],
                 enableEditingLastTag: [Boolean, false],
@@ -140,34 +142,34 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
             $scope.events = new SimplePubSub();
             $scope.tagList = new TagList($scope.options, $scope.events);
 
-            this.registerAutocomplete = function() {
+            this.registerAutocomplete = function () {
                 var input = $element.find('input');
-                input.on('keydown', function(e) {
+                input.on('keydown', function (e) {
                     $scope.events.trigger('input-keydown', e);
                 });
 
                 return {
-                    addTag: function(tag) {
+                    addTag: function (tag) {
                         return $scope.tagList.add(tag);
                     },
-                    focusInput: function() {
+                    focusInput: function () {
                         input[0].focus();
                     },
-                    getTags: function() {
+                    getTags: function () {
                         return $scope.tags;
                     },
-                    getOptions: function() {
+                    getOptions: function () {
                         return $scope.options;
                     },
-                    on: function(name, handler) {
+                    on: function (name, handler) {
                         $scope.events.on(name, handler);
                         return this;
                     }
                 };
             };
         },
-        link: function(scope, element, attrs, ngModelCtrl) {
-            var hotkeys = [KEYS.enter, KEYS.comma, KEYS.space, KEYS.backspace],
+        link: function (scope, element, attrs, ngModelCtrl) {
+            var hotkeys = [KEYS.enter, KEYS.comma, KEYS.space, KEYS.backspace, KEYS.tab],
                 tagList = scope.tagList,
                 events = scope.events,
                 options = scope.options,
@@ -176,23 +178,23 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
             events
                 .on('tag-added', scope.onTagAdded)
                 .on('tag-removed', scope.onTagRemoved)
-                .on('tag-added', function() {
+                .on('tag-added', function () {
                     scope.newTag.text = '';
                 })
-                .on('tag-added tag-removed', function() {
+                .on('tag-added tag-removed', function () {
                     ngModelCtrl.$setViewValue(scope.tags);
                 })
-                .on('invalid-tag', function() {
+                .on('invalid-tag', function () {
                     scope.newTag.invalid = true;
                 })
-                .on('input-change', function() {
+                .on('input-change', function () {
                     tagList.selected = null;
                     scope.newTag.invalid = null;
                 })
-                .on('input-focus', function() {
+                .on('input-focus', function () {
                     ngModelCtrl.$setValidity('leftoverText', true);
                 })
-                .on('input-blur', function() {
+                .on('input-blur', function () {
                     if (!options.addFromAutocompleteOnly) {
                         if (options.addOnBlur) {
                             tagList.addText(scope.newTag.text);
@@ -204,30 +206,30 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
 
             scope.newTag = { text: '', invalid: null };
 
-            scope.getDisplayText = function(tag) {
+            scope.getDisplayText = function (tag) {
                 return tag[options.displayProperty].trim();
             };
 
-            scope.track = function(tag) {
+            scope.track = function (tag) {
                 return tag[options.displayProperty];
             };
 
-            scope.newTagChange = function() {
+            scope.newTagChange = function () {
                 events.trigger('input-change', scope.newTag.text);
             };
 
-            scope.$watch('tags', function(value) {
+            scope.$watch('tags', function (value) {
                 scope.tags = makeObjectArray(value, options.displayProperty);
                 tagList.items = scope.tags;
             });
 
-            scope.$watch('tags.length', function(value) {
+            scope.$watch('tags.length', function (value) {
                 ngModelCtrl.$setValidity('maxTags', angular.isUndefined(options.maxTags) || value <= options.maxTags);
                 ngModelCtrl.$setValidity('minTags', angular.isUndefined(options.minTags) || value >= options.minTags);
             });
 
             input
-                .on('keydown', function(e) {
+                .on('keydown', function (e) {
                     // This hack is needed because jqLite doesn't implement stopImmediatePropagation properly.
                     // I've sent a PR to Angular addressing this issue and hopefully it'll be fixed soon.
                     // https://github.com/angular/angular.js/pull/4833
@@ -247,6 +249,7 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
                     addKeys[KEYS.enter] = options.addOnEnter;
                     addKeys[KEYS.comma] = options.addOnComma;
                     addKeys[KEYS.space] = options.addOnSpace;
+                    addKeys[KEYS.tab] = options.addOnTab;
 
                     shouldAdd = !options.addFromAutocompleteOnly && addKeys[key];
                     shouldRemove = !shouldAdd && key === KEYS.backspace && scope.newTag.text.length === 0;
@@ -267,7 +270,7 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
                         e.preventDefault();
                     }
                 })
-                .on('focus', function() {
+                .on('focus', function () {
                     if (scope.hasFocus) {
                         return;
                     }
@@ -276,8 +279,8 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
 
                     scope.$apply();
                 })
-                .on('blur', function() {
-                    $timeout(function() {
+                .on('blur', function () {
+                    $timeout(function () {
                         var activeElement = $document.prop('activeElement'),
                             lostFocusToBrowserWindow = activeElement === input[0],
                             lostFocusToChildElement = element[0].contains(activeElement);
@@ -289,7 +292,7 @@ tagsInput.directive('tagsInput', function($timeout, $document, tagsInputConfig) 
                     });
                 });
 
-            element.find('div').on('click', function() {
+            element.find('div').on('click', function () {
                 input[0].focus();
             });
         }
